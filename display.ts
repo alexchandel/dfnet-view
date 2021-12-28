@@ -1,6 +1,6 @@
 import {
     DwarfClient
-} from '../lib.js'
+} from 'dfhack-remote'
 
 const tiles = getTiles()
 
@@ -84,7 +84,7 @@ const resizeView = () => {
 const cursor = {'x': 0, 'y': 0}
 
 let df: DwarfClient
-let creatureRaws: Array<any> 
+let creatureRaws: Array<any>
 let tiletypeList: Array<any>
 let matList: Array<any>
 let blockMap: Array<Array<Array<any>>> = []
@@ -228,7 +228,7 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
                 else if (tile.magma !== 0) backgroundDrawn = 4
                 else if (tile.vein !== undefined) backgroundDrawn = 5
                 else backgroundDrawn = 6
-                
+
                 switch (backgroundDrawn) {
                     case 0: {
                         const bgc = tile.unit.char[0][2]
@@ -394,7 +394,7 @@ const bindKVMControls = (
             }
         }
     })
-    
+
     canvas.addEventListener('mousemove', e => {
         cursor.x = Math.floor(e.offsetX / pSize)
         cursor.y = Math.floor(e.offsetY / pSize)
@@ -1172,5 +1172,5 @@ function getTiles () {
         [203, 8, 7],
         [206, 8, 7]
     ]
-    
+
 }
