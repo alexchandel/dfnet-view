@@ -1,6 +1,5 @@
-import {
-    DwarfClient
-} from 'dfhack-remote'
+// @ts-ignore FIXME add types to library
+import { DwarfClient } from 'dfhack-remote'
 
 const tiles = getTiles()
 
@@ -55,6 +54,7 @@ const initializeAtlases = () => {
         newAtlas.height = tileAtlas.height
         {
             const newContext = newAtlas.getContext('2d')
+            if (newContext == null) throw new Error('CanvasRenderingContext2D unavailable: ' + newAtlas)
             newContext.drawImage(tileAtlas, 0, 0)
             newContext.globalCompositeOperation = 'source-in'
             newContext.fillStyle = rgbstr
@@ -119,12 +119,12 @@ type BlockReq = {
 }
 
 /** HACK fix block request range, to avoid blank border issue */
-const blockRequestCorrection = (blkReq: BlockReq): BlockReq => {
-    const correct = new Map([[4, 7], [3, 7], [2, 5], [1, 5], [0, 3]])
-    let newMinX = blkReq.minX
-    let newMinY = blkReq.minY
-    if (blkReq.minY <= 4 && blkReq.minX > correct.get(blkReq.minY)) newMinX = correct.get(blkReq.minY)
-    if (blkReq.minX <= 4 && blkReq.minY > correct.get(blkReq.minX)) newMinY = correct.get(blkReq.minX)
+const fixBlockRequest = (blkReq: BlockReq): BlockReq => {
+    const correct: Map<number, number> = new Map([[4, 7], [3, 7], [2, 5], [1, 5], [0, 3]])
+    const newX = correct.get(blkReq.minY) ?? blkReq.minX
+    const newY = correct.get(blkReq.minX) ?? blkReq.minY
+    const newMinX = (blkReq.minY <= 4 && blkReq.minX > newX) ? blkReq.minX : newX
+    const newMinY = (blkReq.minX <= 4 && blkReq.minY > newY) ? blkReq.minY : newY
     blkReq.minX = newMinX
     blkReq.minY = newMinY
     return blkReq
@@ -292,7 +292,7 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
 }
 
 const updateCanvas = async (df : DwarfClient, ctx: CanvasRenderingContext2D) => {
-    const blockRequest: BlockReq = blockRequestCorrection({
+    const blockRequest: BlockReq = fixBlockRequest({
         'minX': Math.max(Math.floor(viewMinX / 16), 0),
         'minY': Math.max(Math.floor(viewMinY / 16), 0),
         'minZ': viewZ,
@@ -434,10 +434,12 @@ const bindKVMControls = (
  */
 async function main () {
     df = new DwarfClient()
+    /* @ts-ignore FIXME Debugging assignments */
     window['df'] = df
     initializeAtlases()
     resizeView()
-    const ctx: CanvasRenderingContext2D = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d')
+    if (ctx == null) throw new Error('CanvasRenderingContext2D unavailable: ' + canvas)
     {
         const caption = document.getElementById('caption') as HTMLDivElement
         bindKVMControls(canvas, caption, () => updateCanvas(df, ctx), () => paintTiles(ctx))
@@ -446,7 +448,7 @@ async function main () {
     await useClient(df, ctx)
 }
 
-/* FIXME Debugging assignments */
+/* @ts-ignore FIXME Debugging assignments */
 window['main'] = main
 
 document.readyState == 'complete' ? main() : window.addEventListener('load', main)
