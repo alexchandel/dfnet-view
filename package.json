@@ -5,6 +5,8 @@
   "main": "display.ts",
   "scripts": {
     "install": "tsc -b",
+    "postinstall": "browserify display.js -o gui.js",
+    "start": "websockify --web=. 127.0.0.1:8080 127.0.0.1:5000",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
