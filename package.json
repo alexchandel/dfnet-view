@@ -1,0 +1,36 @@
+{
+  "name": "dfnet-view",
+  "version": "1.0.0",
+  "description": "Browser view for Dwarf Fortress using DFHack",
+  "main": "display.ts",
+  "scripts": {
+    "install": "tsc -b",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexchandel/dfnet-view.git"
+  },
+  "keywords": [
+    "dwarf",
+    "fortress",
+    "dfhack",
+    "remote",
+    "gui",
+    "RemoteFortressReader"
+  ],
+  "author": "Alex",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/alexchandel/dfnet-view/issues"
+  },
+  "homepage": "https://github.com/alexchandel/dfnet-view#readme",
+  "dependencies": {
+    "dfhack-remote": "github:alexchandel/dfhack-remote"
+  },
+  "devDependencies": {
+    "browserify": "^16.5.1",
+    "websockify": "^0.7.1",
+    "ws": "~0.4.27"
+  }
+}
