@@ -1,8 +1,6 @@
 // @ts-ignore FIXME add types to library
 import { DwarfClient } from 'dfhack-remote'
 
-const tiles = getTiles()
-
 type UInt3 = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 type ColorID = 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15
 type UInt8 =
@@ -24,6 +22,10 @@ type UInt8 =
     240|241|242|243|244|245|246|247|248|249|250|251|252|253|254|255
 type TileCharID = UInt8
 
+const tiles = getTiles()
+const TILE_HIDDEN = null
+const TILE_VOID = 0
+const TILE_EMPTY = 0x20
 
 /**
  * The 16 color names are:
@@ -186,8 +188,8 @@ const updateBlockMap = (blockList: any, unitList: any, creatureRaws: any) => {
                     const isHidden = mapBlock.hidden[i]
                     // FIXME check if ID in tiles list
                     blockMap[coords.z][coords.y][coords.x] = {
-                        tile: tiles[isHidden ? 0 : tileID],
-                        tileID: isHidden ? null : tileID,
+                        tile: tiles[isHidden ? TILE_VOID : tileID],
+                        tileID: isHidden ? TILE_HIDDEN : tileID,
                         water: mapBlock.water[i] || 0,
                         magma: mapBlock.magma[i] || 0,
                         unit: { unit: [], char: [] },
