@@ -269,9 +269,12 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
             let backgroundDrawn: number
 
             // pick which background to draw
-            if (tile.unit.unit.length !== 0) {
+            if (tile.tileID === TILE_HIDDEN) {
+                // hidden
+            } else if (tile.unit.unit.length !== 0) {
                 const bgc = tile.unit.char[0][2]
                 writeBgTile(ctx, j, i, bgc)
+                // no item case
             } else if (tile.building !== undefined) {
                 // TODO
             } else if (tile.water !== 0) {
@@ -282,14 +285,17 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
                 writeBgTile(ctx, j, i, bgc)
             } else if (tile.vein !== undefined) {
                 // TODO
-            } else if (tile.tile != null) {
+            } else if (tile.tileID != null && tile.tile != null) {
+                // regular tile
                 writeBgTile(ctx, j, i, tile.tile[2])
             } else {
                 console.warn('Unknown block case')
             }
 
             // pick which char to draw (from unit, from item, etc) (only one)
-            if (tile.unit.unit.length !== 0) {
+            if (tile.tileID === TILE_HIDDEN) {
+                // hidden
+            } else if (tile.unit.unit.length !== 0) {
                 writeTile(ctx, tile.unit.char[0][0], j, i, tile.unit.char[0][1])
             } else if (tile.item !== undefined) {
                 writeTile(ctx, tile.item[0], j, i, tile.item[1])
@@ -301,7 +307,8 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
                 writeTile(ctx, (48 + tile.magma) as TileCharID, j, i, 5)
             } else if (tile.vein !== undefined) {
                 // TODO
-            } else if (tile.tile != null) {
+            } else if (tile.tileID != null && tile.tile != null) {
+                // regular tile
                 writeTile(ctx, tile.tile[0], j, i, tile.tile[1])
             } else {
                 console.warn('Unknown block case')
