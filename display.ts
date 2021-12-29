@@ -261,8 +261,8 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
     ctx.fillStyle = '#000000'
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
     // render all tiles in view
-    blockMap[viewZ].slice(viewMinY, viewMinY + viewHeight).forEach((row : Array<any>, i : number) => {
-        row.slice(viewMinX, viewMinX + viewWidth).forEach((tile : any, j) => {
+    blockMap[viewZ].slice(viewMinY, viewMinY + viewHeight).forEach((row, i) => {
+        row.slice(viewMinX, viewMinX + viewWidth).forEach((tile, j) => {
             let charDrawn: number
             let backgroundDrawn: number
 
@@ -273,7 +273,8 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
             else if (tile.water !== 0) charDrawn = 3
             else if (tile.magma !== 0) charDrawn = 4
             else if (tile.vein !== undefined) charDrawn = 5
-            else charDrawn = 6
+            else if (tile.tile != null) charDrawn = 6
+            else charDrawn = 7
 
             // pick which background to draw
             if (tile.unit.unit.length !== 0) backgroundDrawn = 0
@@ -281,7 +282,8 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
             else if (tile.water !== 0) backgroundDrawn = 3
             else if (tile.magma !== 0) backgroundDrawn = 4
             else if (tile.vein !== undefined) backgroundDrawn = 5
-            else backgroundDrawn = 6
+            else if (tile.tile != null) backgroundDrawn = 6
+            else backgroundDrawn = 7
 
             switch (backgroundDrawn) {
                 case 0: {
@@ -309,12 +311,12 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
                     writeBgTile(ctx, j, i, bgc)
                     break
                 }
-
+                default:
+                    break
             }
 
             switch (charDrawn) {
                 case 0: {
-
                     writeTile(ctx, tile.unit.char[0][0], j, i, tile.unit.char[0][1])
                     break
                 }
@@ -325,11 +327,11 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
                 case 2:
                     break
                 case 3: {
-                    writeTile(ctx, 48 + tile.water, j, i, 1)
+                    writeTile(ctx, (48 + tile.water) as TileCharID, j, i, 1)
                     break
                 }
                 case 4: {
-                    writeTile(ctx, 48 + tile.magma, j, i, 5)
+                    writeTile(ctx, (48 + tile.magma) as TileCharID, j, i, 5)
                     break
                 }
                 case 5: {
@@ -339,7 +341,8 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
                     writeTile(ctx, tile.tile[0], j, i, tile.tile[1])
                     break
                 }
-
+                default:
+                    break
             }
         })
     })
