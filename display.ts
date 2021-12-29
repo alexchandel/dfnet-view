@@ -111,11 +111,13 @@ let matList: Array<any>
 type Block = {
     tile: [TileCharID, ColorID, ColorID] | null,
     tileID: number | null,
-    water?: UInt3,
-    magma?: UInt3,
+    water: UInt3,
+    magma: UInt3,
+    building?: number,
+    vein?: number,
     item?: [TileCharID, ColorID, ColorID]
     itemData?: any,
-    unit?: {unit: any[], char: any[]},
+    unit: {unit: any[], char: any[]},
 }
 let blockMap: Block[][][] = []
 
@@ -181,15 +183,20 @@ const updateBlockMap = (blockList: any, unitList: any, creatureRaws: any) => {
                     if (blockMap[coords.z][coords.y] == undefined) {
                         blockMap[coords.z][coords.y] = []
                     }
-                    if (!mapBlock.hidden[i]) { // FIXME check if ID in tiles list
-                        blockMap[coords.z][coords.y][coords.x] = { 'tile': tiles[tileID], 'tileID': tileID }
-                    } else blockMap[coords.z][coords.y][coords.x] = { 'tile': tiles[0], 'tileID': null }
-                    blockMap[coords.z][coords.y][coords.x].water = mapBlock.water[i]
-                    blockMap[coords.z][coords.y][coords.x].magma = mapBlock.magma[i]
+                    const isHidden = mapBlock.hidden[i]
+                    // FIXME check if ID in tiles list
+                    blockMap[coords.z][coords.y][coords.x] = {
+                        tile: tiles[isHidden ? 0 : tileID],
+                        tileID: isHidden ? null : tileID,
+                        water: mapBlock.water[i] || 0,
+                        magma: mapBlock.magma[i] || 0,
+                        unit: { unit: [], char: [] },
+                    }
                 })
                 if (mapBlock.items != undefined) {
                     mapBlock.items.forEach((item: any, i: number) => {
                         const tileCharID = getItemChar(item.type.matType)
+                        // FIXME overwrites lower items
                         blockMap[item.pos.z][item.pos.y][item.pos.x].item = [tileCharID, 15, 0]
                         blockMap[item.pos.z][item.pos.y][item.pos.x].itemData = item
                     })
@@ -199,7 +206,7 @@ const updateBlockMap = (blockList: any, unitList: any, creatureRaws: any) => {
         // adds unit/char to all visible blocks
         blockMap[viewZ].slice(viewMinY, viewMinY + viewHeight).forEach((row, i) => {
             row.slice(viewMinX, viewMinX + viewWidth).forEach((tile, j) => {
-                tile.unit = {'unit': [], 'char': []}
+                tile.unit = { unit: [], char: [] }
             })
         })
         for (const unit of unitList) {
@@ -212,6 +219,8 @@ const updateBlockMap = (blockList: any, unitList: any, creatureRaws: any) => {
                         getColorIdFromProfessionID(unit.professionId),
                         0
                     ])
+                } else {
+                    console.error(`Unit at missing block ${[unit.posX, unit.posY, unit.posZ]}`)
                 }
             }
         }
@@ -232,7 +241,7 @@ const writeBgTile = (
  */
 const writeTile = (
     context: CanvasRenderingContext2D,
-    tileID: number, xi: number, yi: number, fgc: ColorID
+    tileCharID: TileCharID, xi: number, yi: number, fgc: ColorID
 ) => {
     context.drawImage(
         coloredAtlases[fgc], // image
