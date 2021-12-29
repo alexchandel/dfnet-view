@@ -3,9 +3,6 @@ import { DwarfClient } from 'dfhack-remote'
 
 const tiles = getTiles()
 
-/** Length of tileset squares */
-const pxPerAtlasTile = 18
-
 type UInt3 = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 type ColorID = 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15
 type UInt8 =
@@ -59,15 +56,18 @@ const COLOR_SCHEME_STR = COLOR_SCHEME.map(
     rgb => '#' + rgb.map(n => n.toString(16).padStart(2, '0')).join('')
 )
 
-/**
- * Cache of colored atlases, for all 16 colors.
- */
+/** Cache of colored atlases, for all 16 colors. */
 let coloredAtlases: HTMLCanvasElement[]
+/** Length of tileset squares */
+let pxPerAtlasTileW: number
+let pxPerAtlasTileH: number
 
 /** Initialize colored atlases after load */
 const initializeAtlases = () => {
     /** Tileset image from DF. */
     const tileAtlas = document.getElementById('tileset') as HTMLImageElement
+    pxPerAtlasTileW = tileAtlas.naturalWidth / 16
+    pxPerAtlasTileH = tileAtlas.naturalHeight / 16
 
     coloredAtlases = COLOR_SCHEME_STR.map((rgbstr, i) => {
         const newAtlas = document.createElement('canvas')
@@ -225,10 +225,10 @@ const writeTile = (
 ) => {
     context.drawImage(
         coloredAtlases[fgc], // image
-        pxPerAtlasTile * (tileID % 16), // source x
-        pxPerAtlasTile * Math.floor(tileID / 16), // source y
-        pxPerAtlasTile, // source width
-        pxPerAtlasTile, // source height
+        pxPerAtlasTileW * (tileCharID % 16), // source x
+        pxPerAtlasTileH * Math.floor(tileCharID / 16), // source y
+        pxPerAtlasTileW, // source width
+        pxPerAtlasTileH, // source height
 
         pSize * xi, // target x
         pSize * yi, // target y
