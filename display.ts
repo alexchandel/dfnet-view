@@ -266,83 +266,43 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
             let charDrawn: number
             let backgroundDrawn: number
 
-            // pick which char to draw (from unit, from item, etc) (only one)
-            if (tile.unit.unit.length !== 0) charDrawn = 0
-            else if (tile.item !== undefined) charDrawn = 1
-            else if (tile.building !== undefined) charDrawn = 2
-            else if (tile.water !== 0) charDrawn = 3
-            else if (tile.magma !== 0) charDrawn = 4
-            else if (tile.vein !== undefined) charDrawn = 5
-            else if (tile.tile != null) charDrawn = 6
-            else charDrawn = 7
-
             // pick which background to draw
-            if (tile.unit.unit.length !== 0) backgroundDrawn = 0
-            else if (tile.building !== undefined) backgroundDrawn = 2
-            else if (tile.water !== 0) backgroundDrawn = 3
-            else if (tile.magma !== 0) backgroundDrawn = 4
-            else if (tile.vein !== undefined) backgroundDrawn = 5
-            else if (tile.tile != null) backgroundDrawn = 6
-            else backgroundDrawn = 7
-
-            switch (backgroundDrawn) {
-                case 0: {
-                    const bgc = tile.unit.char[0][2]
-                    writeBgTile(ctx, j, i, bgc)
-                    break
-                }
-                case 2:
-                    break
-                case 3: {
-                    const bgc = 0
-                    writeBgTile(ctx, j, i, bgc)
-                    break
-                }
-                case 4: {
-                    const bgc = 0
-                    writeBgTile(ctx, j, i, bgc)
-                    break
-                }
-                case 5: {
-                    break
-                }
-                case 6: {
-                    const bgc = tile.tile[2]
-                    writeBgTile(ctx, j, i, bgc)
-                    break
-                }
-                default:
-                    break
+            if (tile.unit.unit.length !== 0) {
+                const bgc = tile.unit.char[0][2]
+                writeBgTile(ctx, j, i, bgc)
+            } else if (tile.building !== undefined) {
+                // TODO
+            } else if (tile.water !== 0) {
+                const bgc = 0
+                writeBgTile(ctx, j, i, bgc)
+            } else if (tile.magma !== 0) {
+                const bgc = 0
+                writeBgTile(ctx, j, i, bgc)
+            } else if (tile.vein !== undefined) {
+                // TODO
+            } else if (tile.tile != null) {
+                writeBgTile(ctx, j, i, tile.tile[2])
+            } else {
+                console.warn('Unknown block case')
             }
 
-            switch (charDrawn) {
-                case 0: {
-                    writeTile(ctx, tile.unit.char[0][0], j, i, tile.unit.char[0][1])
-                    break
-                }
-                case 1: {
-                    writeTile(ctx, tile.item[0], j, i, tile.item[1])
-                    break
-                }
-                case 2:
-                    break
-                case 3: {
-                    writeTile(ctx, (48 + tile.water) as TileCharID, j, i, 1)
-                    break
-                }
-                case 4: {
-                    writeTile(ctx, (48 + tile.magma) as TileCharID, j, i, 5)
-                    break
-                }
-                case 5: {
-                    break
-                }
-                case 6: {
-                    writeTile(ctx, tile.tile[0], j, i, tile.tile[1])
-                    break
-                }
-                default:
-                    break
+            // pick which char to draw (from unit, from item, etc) (only one)
+            if (tile.unit.unit.length !== 0) {
+                writeTile(ctx, tile.unit.char[0][0], j, i, tile.unit.char[0][1])
+            } else if (tile.item !== undefined) {
+                writeTile(ctx, tile.item[0], j, i, tile.item[1])
+            } else if (tile.building !== undefined) {
+                // TODO
+            } else if (tile.water !== 0) {
+                writeTile(ctx, (48 + tile.water) as TileCharID, j, i, 1)
+            } else if (tile.magma !== 0) {
+                writeTile(ctx, (48 + tile.magma) as TileCharID, j, i, 5)
+            } else if (tile.vein !== undefined) {
+                // TODO
+            } else if (tile.tile != null) {
+                writeTile(ctx, tile.tile[0], j, i, tile.tile[1])
+            } else {
+                console.warn('Unknown block case')
             }
         })
     })
