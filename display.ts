@@ -130,6 +130,7 @@ const fixBlockRequest = (blkReq: BlockReq): BlockReq => {
     return blkReq
 }
 
+/** Update {@link mapBlock} with values from IO */
 const updateBlockMap = (blockList: any, unitList: any, creatureRaws: any) => {
     if (blockList.mapBlocks != undefined) {
         for (const mapBlock of blockList.mapBlocks) {
@@ -291,6 +292,7 @@ const paintTiles = (ctx: CanvasRenderingContext2D) => {
         })
 }
 
+/** Poll tiles in viewport, update cache, repaint */
 const updateCanvas = async (df : DwarfClient, ctx: CanvasRenderingContext2D) => {
     const blockRequest: BlockReq = fixBlockRequest({
         'minX': Math.max(Math.floor(viewMinX / 16), 0),
@@ -438,13 +440,17 @@ async function main () {
     window['df'] = df
     initializeAtlases()
     resizeView()
+
     const ctx = canvas.getContext('2d')
+
+    // configure controls
     if (ctx == null) throw new Error('CanvasRenderingContext2D unavailable: ' + canvas)
     {
         const caption = document.getElementById('caption') as HTMLDivElement
         bindKVMControls(canvas, caption, () => updateCanvas(df, ctx), () => paintTiles(ctx))
     }
     canvas.focus()
+
     await useClient(df, ctx)
 }
 
@@ -465,10 +471,10 @@ function getItemChar (itemTypeID: number): number {
             return 22 // ▬
             break
         case 56:
-            return 237
+            return 237 // φ
             break
         case 57:
-            return 11
+            return 11 // ♂
             break
         default:
             return 63 // ?
