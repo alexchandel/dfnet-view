@@ -127,7 +127,10 @@ let blockMap: Block[][][] = []
 // }
 
 const posIsInView = (posX: number, posY: number, posZ: number): boolean => {
-    return posZ === viewZ && posX >= viewMinX && posX < viewMinX + viewWidth && posY >= viewMinY && posY < viewMinY + viewHeight
+    return (
+        posZ === viewZ && posX >= viewMinX && posX < viewMinX + viewWidth
+            && posY >= viewMinY && posY < viewMinY + viewHeight
+    )
 }
 
 const getRelativeCoords = (index: number): {x: number, y: number, z: number} => {
@@ -167,7 +170,11 @@ const updateBlockMap = (blockList: any, unitList: any, creatureRaws: any) => {
             if (mapBlock.tiles != undefined) {
                 mapBlock.tiles.forEach((tileID: number, i: number) => {
                     const relCoords = getRelativeCoords(i)
-                    const coords = {x: mapBlock.mapX + relCoords.x, y: mapBlock.mapY + relCoords.y, z: mapBlock.mapZ + relCoords.z}
+                    const coords = {
+                        x: mapBlock.mapX + relCoords.x,
+                        y: mapBlock.mapY + relCoords.y,
+                        z: mapBlock.mapZ + relCoords.z
+                    }
                     if (blockMap[coords.z] == undefined) {
                         blockMap[coords.z] = []
                     }
@@ -200,7 +207,11 @@ const updateBlockMap = (blockList: any, unitList: any, creatureRaws: any) => {
                 const block = blockMap[unit.posZ][unit.posY][unit.posX]
                 if (block.unit != undefined) {  // FIXME ensure this is defined
                     block.unit.unit.push(unit)
-                    block.unit.char.push([creatureRaws[unit.race.matType].creatureTile, getColorIdFromProfessionID(unit.professionId), 0])
+                    block.unit.char.push([
+                        creatureRaws[unit.race.matType].creatureTile,
+                        getColorIdFromProfessionID(unit.professionId),
+                        0
+                    ])
                 }
             }
         }
@@ -346,7 +357,9 @@ async function useClient (df: DwarfClient, ctx: CanvasRenderingContext2D) {
         await df.ready()
         console.log('new DwarfClient:', df)
         await df.ResetMapHashes()
-        let blockList = await df.GetBlockList({'minX': 1, 'minY': 1, 'minZ': 150, 'maxX': 9, 'maxY': 9, 'maxZ': 160})
+        let blockList = await df.GetBlockList(
+            {'minX': 1, 'minY': 1, 'minZ': 150, 'maxX': 9, 'maxY': 9, 'maxZ': 160}
+        )
         tiletypeList = (await df.GetTiletypeList()).tiletypeList
         matList = (await df.GetMaterialList()).materialList
         const unitList = (await df.GetUnitList()).creatureList
@@ -374,8 +387,12 @@ const updateCaption = (caption: HTMLDivElement) => {
             const itemData = block.itemData
             const units = block.unit
             if (tileID != null) caption.textContent += ', ' +  tiletypeList[tileID].caption
-            if (itemData !== undefined) caption.textContent += ', ' + matList.filter(e => e.matPair.matType === itemData.material.matType && e.matPair.matIndex === itemData.material.matIndex)[0].name
-            if (units !== undefined && units.unit.length !== 0) {
+            if (itemData != undefined) {
+                const mat = itemData.material
+                caption.textContent += ', ' + matList.filter(e =>
+                    e.matPair.matType === mat.matType && e.matPair.matIndex === mat.matIndex)[0].name
+            }
+            if (units != undefined && units.unit.length !== 0) {
                 for (const unit of units.unit) {
                     if (unit.name !== undefined) {
                         caption.textContent += ', ' + unit.name
