@@ -153,8 +153,8 @@ const fixBlockRequest = (blkReq: BlockReq): BlockReq => {
     const correct: Map<number, number> = new Map([[4, 7], [3, 7], [2, 5], [1, 5], [0, 3]])
     const newX = correct.get(blkReq.minY) ?? blkReq.minX
     const newY = correct.get(blkReq.minX) ?? blkReq.minY
-    const newMinX = (blkReq.minY <= 4 && blkReq.minX > newX) ? blkReq.minX : newX
-    const newMinY = (blkReq.minX <= 4 && blkReq.minY > newY) ? blkReq.minY : newY
+    const newMinX = (blkReq.minY <= 4 && blkReq.minX > newX) ? newX : blkReq.minX
+    const newMinY = (blkReq.minX <= 4 && blkReq.minY > newY) ? newY : blkReq.minY
     blkReq.minX = newMinX
     blkReq.minY = newMinY
     return blkReq
