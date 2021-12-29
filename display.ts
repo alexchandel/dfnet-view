@@ -367,19 +367,22 @@ async function useClient (df: DwarfClient, ctx: CanvasRenderingContext2D) {
 
 const updateCaption = (caption: HTMLDivElement) => {
     caption.textContent = 'x: ' + (viewMinX + cursor.x) + ' y: ' + (viewMinY + cursor.y)
-    if (blockMap[viewZ] !== undefined) {
-        const tileID = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].tileID
-        const itemData = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].itemData
-        const units = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].unit
-        if (tileID != null) caption.textContent += ', ' +  tiletypeList[tileID].caption
-        if (itemData !== undefined) caption.textContent += ', ' + matList.filter(e => e.matPair.matType === itemData.material.matType && e.matPair.matIndex === itemData.material.matIndex)[0].name
-        if (units !== undefined && units.unit.length !== 0) {
-            for (const unit of units.unit) {
-                if (unit.name !== undefined) {
-                    caption.textContent += ', ' + unit.name
-                    caption.textContent += ' (' + creatureRaws[unit.race.matType].name[0] + ')'
-                } else {
-                    caption.textContent += ', ' + creatureRaws[unit.race.matType].name[0]
+    if (blockMap[viewZ] !== undefined && blockMap[viewZ][(viewMinY + cursor.y)] !== undefined) {
+        const block = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)]
+        if (block !== undefined) {
+            const tileID = block.tileID
+            const itemData = block.itemData
+            const units = block.unit
+            if (tileID != null) caption.textContent += ', ' +  tiletypeList[tileID].caption
+            if (itemData !== undefined) caption.textContent += ', ' + matList.filter(e => e.matPair.matType === itemData.material.matType && e.matPair.matIndex === itemData.material.matIndex)[0].name
+            if (units !== undefined && units.unit.length !== 0) {
+                for (const unit of units.unit) {
+                    if (unit.name !== undefined) {
+                        caption.textContent += ', ' + unit.name
+                        caption.textContent += ' (' + creatureRaws[unit.race.matType].name[0] + ')'
+                    } else {
+                        caption.textContent += ', ' + creatureRaws[unit.race.matType].name[0]
+                    }
                 }
             }
         }
