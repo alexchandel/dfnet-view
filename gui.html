@@ -13,12 +13,20 @@ body {
     height: 95vh;
     background-color: aqua;
 }
+#gui > .bottom-bar {
+    max-height: 5vh;
+}
+.bottom-bar > * {
+    margin: 0 1em;
+}
 </style>
 </head>
 <body>
     <div id="gui">
         <canvas id="canvas" tabindex="1" width="800px" height="600px"></canvas>
-        <div id="caption"></div>
+        <div id="bottomBar" class="bottom-bar">
+            <div id="caption" class="float-left"></div>
+        </div>
     </div>
 <div style="display:none"><img id="tileset" src="./CLA.png" alt="tileset"></div>
 <script src="./gui.js" async></script>
