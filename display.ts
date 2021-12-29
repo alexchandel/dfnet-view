@@ -6,12 +6,34 @@ const tiles = getTiles()
 /** Length of tileset squares */
 const pxPerAtlasTile = 18
 
+type UInt3 = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
+type ColorID = 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15
+type UInt8 =
+    0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|
+    16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|
+    32|33|34|35|36|37|38|39|40|41|42|43|44|45|46|47|
+    48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|
+    64|65|66|67|68|69|70|71|72|73|74|75|76|77|78|79|
+    80|81|82|83|84|85|86|87|88|89|90|91|92|93|94|95|
+    96|97|98|99|100|101|102|103|104|105|106|107|108|109|110|111|
+    112|113|114|115|116|117|118|119|120|121|122|123|124|125|126|127|
+    128|129|130|131|132|133|134|135|136|137|138|139|140|141|142|143|
+    144|145|146|147|148|149|150|151|152|153|154|155|156|157|158|159|
+    160|161|162|163|164|165|166|167|168|169|170|171|172|173|174|175|
+    176|177|178|179|180|181|182|183|184|185|186|187|188|189|190|191|
+    192|193|194|195|196|197|198|199|200|201|202|203|204|205|206|207|
+    208|209|210|211|212|213|214|215|216|217|218|219|220|221|222|223|
+    224|225|226|227|228|229|230|231|232|233|234|235|236|237|238|239|
+    240|241|242|243|244|245|246|247|248|249|250|251|252|253|254|255
+type TileCharID = UInt8
+
+
 /**
  * The 16 color names are:
  * BLACK,  BLUE,  GREEN,  CYAN,  RED,  MAGENTA,  BROWN, LGRAY,
  * DGRAY, LBLUE, LGREEN, LCYAN, LRED, LMAGENTA, YELLOW, WHITE.
  */
-const COLOR_SCHEME = [
+const COLOR_SCHEME: UInt8[][] = [
     [0, 0, 0],
     [54, 58, 111],
     [51, 83, 28],
@@ -29,7 +51,6 @@ const COLOR_SCHEME = [
     [248, 178, 12],
     [255, 255, 255],
 ]
-type ColorID = 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15
 
 /**
  * Cache of the RGB style strings, for the 16 colors.
@@ -87,7 +108,16 @@ let df: DwarfClient
 let creatureRaws: Array<any>
 let tiletypeList: Array<any>
 let matList: Array<any>
-let blockMap: Array<Array<Array<any>>> = []
+type Block = {
+    tile: [TileCharID, ColorID, ColorID] | null,
+    tileID: number | null,
+    water?: UInt3,
+    magma?: UInt3,
+    item?: [TileCharID, ColorID, ColorID]
+    itemData?: any,
+    unit?: {unit: any[], char: any[]},
+}
+let blockMap: Block[][][] = []
 
 // const rgbToHex = (rgb : Array<number>) => {
 //     const r: String = rgb[0].toString(16).padStart(2, '0')
@@ -135,7 +165,7 @@ const updateBlockMap = (blockList: any, unitList: any, creatureRaws: any) => {
     if (blockList.mapBlocks != undefined) {
         for (const mapBlock of blockList.mapBlocks) {
             if (mapBlock.tiles != undefined) {
-                mapBlock.tiles.forEach((tile : number, i : number) => {
+                mapBlock.tiles.forEach((tileID: number, i: number) => {
                     const relCoords = getRelativeCoords(i)
                     const coords = {x: mapBlock.mapX + relCoords.x, y: mapBlock.mapY + relCoords.y, z: mapBlock.mapZ + relCoords.z}
                     if (blockMap[coords.z] == undefined) {
@@ -144,31 +174,34 @@ const updateBlockMap = (blockList: any, unitList: any, creatureRaws: any) => {
                     if (blockMap[coords.z][coords.y] == undefined) {
                         blockMap[coords.z][coords.y] = []
                     }
-                    if (!mapBlock.hidden[i]) {
-                        blockMap[coords.z][coords.y][coords.x] = {'tile': tiles[tile]}
-                        blockMap[coords.z][coords.y][coords.x].tileID = tile
-                    } else blockMap[coords.z][coords.y][coords.x] = {'tile': tiles[0]}
+                    if (!mapBlock.hidden[i]) { // FIXME check if ID in tiles list
+                        blockMap[coords.z][coords.y][coords.x] = { 'tile': tiles[tileID], 'tileID': tileID }
+                    } else blockMap[coords.z][coords.y][coords.x] = { 'tile': tiles[0], 'tileID': null }
                     blockMap[coords.z][coords.y][coords.x].water = mapBlock.water[i]
                     blockMap[coords.z][coords.y][coords.x].magma = mapBlock.magma[i]
                 })
                 if (mapBlock.items != undefined) {
                     mapBlock.items.forEach((item: any, i: number) => {
-                        const tileID = getItemChar(item.type.matType)
-                        blockMap[item.pos.z][item.pos.y][item.pos.x].item = [tileID, 15, 0]
+                        const tileCharID = getItemChar(item.type.matType)
+                        blockMap[item.pos.z][item.pos.y][item.pos.x].item = [tileCharID, 15, 0]
                         blockMap[item.pos.z][item.pos.y][item.pos.x].itemData = item
                     })
                 }
             }
         }
-        blockMap[viewZ].slice(viewMinY, viewMinY + viewHeight).forEach((row: Array<any>, i: number) => {
-            row.slice(viewMinX, viewMinX + viewWidth).forEach((tile : any, j) => {
+        // adds unit/char to all visible blocks
+        blockMap[viewZ].slice(viewMinY, viewMinY + viewHeight).forEach((row, i) => {
+            row.slice(viewMinX, viewMinX + viewWidth).forEach((tile, j) => {
                 tile.unit = {'unit': [], 'char': []}
             })
         })
         for (const unit of unitList) {
             if (posIsInView(unit.posX, unit.posY, unit.posZ)) {
-                blockMap[unit.posZ][unit.posY][unit.posX].unit.unit.push(unit)
-                blockMap[unit.posZ][unit.posY][unit.posX].unit.char.push([creatureRaws[unit.race.matType].creatureTile, getColorIdFromProfessionID(unit.professionId), 0])
+                const block = blockMap[unit.posZ][unit.posY][unit.posX]
+                if (block.unit != undefined) {  // FIXME ensure this is defined
+                    block.unit.unit.push(unit)
+                    block.unit.char.push([creatureRaws[unit.race.matType].creatureTile, getColorIdFromProfessionID(unit.professionId), 0])
+                }
             }
         }
     }
@@ -332,6 +365,27 @@ async function useClient (df: DwarfClient, ctx: CanvasRenderingContext2D) {
     }
 }
 
+const updateCaption = (caption: HTMLDivElement) => {
+    caption.textContent = 'x: ' + (viewMinX + cursor.x) + ' y: ' + (viewMinY + cursor.y)
+    if (blockMap[viewZ] !== undefined) {
+        const tileID = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].tileID
+        const itemData = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].itemData
+        const units = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].unit
+        if (tileID != null) caption.textContent += ', ' +  tiletypeList[tileID].caption
+        if (itemData !== undefined) caption.textContent += ', ' + matList.filter(e => e.matPair.matType === itemData.material.matType && e.matPair.matIndex === itemData.material.matIndex)[0].name
+        if (units !== undefined && units.unit.length !== 0) {
+            for (const unit of units.unit) {
+                if (unit.name !== undefined) {
+                    caption.textContent += ', ' + unit.name
+                    caption.textContent += ' (' + creatureRaws[unit.race.matType].name[0] + ')'
+                } else {
+                    caption.textContent += ', ' + creatureRaws[unit.race.matType].name[0]
+                }
+            }
+        }
+    }
+}
+
 const bindKVMControls = (
     canvas: HTMLCanvasElement,
     caption: HTMLDivElement,
@@ -377,47 +431,13 @@ const bindKVMControls = (
         } else if (key === ' ') {
             refreshView()
         }
-        caption.textContent = 'x: ' + (viewMinX + cursor.x) + ' y: ' + (viewMinY + cursor.y)
-        if (blockMap[viewZ] !== undefined) {
-            const tileID: number = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].tileID
-            const itemData = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].itemData
-            const units = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].unit
-            if (tileID != undefined) caption.textContent += ', ' +  tiletypeList[tileID].caption
-            if (itemData !== undefined) caption.textContent += ', ' + matList.filter(e => e.matPair.matType === itemData.material.matType && e.matPair.matIndex === itemData.material.matIndex)[0].name
-            if (units !== undefined && units.unit.length !== 0) {
-                for (const unit of units.unit) {
-                    if (unit.name !== undefined) {
-                        caption.textContent += ', ' + unit.name
-                        caption.textContent += ' (' + creatureRaws[unit.race.matType].name[0] + ')'
-                    } else {
-                        caption.textContent += ', ' + creatureRaws[unit.race.matType].name[0]
-                    }
-                }
-            }
-        }
+        updateCaption(caption)
     })
 
     canvas.addEventListener('mousemove', e => {
         cursor.x = Math.floor(e.offsetX / pSize)
         cursor.y = Math.floor(e.offsetY / pSize)
-        caption.textContent = 'x: ' + (viewMinX + cursor.x) + ' y: ' + (viewMinY + cursor.y)
-        if (blockMap[viewZ] !== undefined) {
-            const tileID: number = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].tileID
-            const itemData = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].itemData
-            const units = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)].unit
-            if (tileID != undefined) caption.textContent += ', ' +  tiletypeList[tileID].caption
-            if (itemData !== undefined) caption.textContent += ', ' + matList.filter(e => e.matPair.matType === itemData.material.matType && e.matPair.matIndex === itemData.material.matIndex)[0].name
-            if (units !== undefined && units.unit.length !== 0) {
-                for (const unit of units.unit) {
-                    if (unit.name !== undefined) {
-                        caption.textContent += ', ' + unit.name
-                        caption.textContent += ' (' + creatureRaws[unit.race.matType].name[0] + ')'
-                    } else {
-                        caption.textContent += ', ' + creatureRaws[unit.race.matType].name[0]
-                    }
-                }
-            }
-        }
+        updateCaption(caption)
     })
 
     window.addEventListener('resize', e => {
@@ -459,7 +479,7 @@ window['main'] = main
 
 document.readyState == 'complete' ? main() : window.addEventListener('load', main)
 
-function getItemChar (itemTypeID: number): number {
+function getItemChar (itemTypeID: number): TileCharID {
     switch (itemTypeID) {
         case 3:
             return 15 // ☼
@@ -482,7 +502,7 @@ function getItemChar (itemTypeID: number): number {
     }
 }
 
-function getTiles () {
+function getTiles (): ([TileCharID, ColorID, ColorID] | null)[] {
     return [
         [255, 0, 0],
         [31, 15, 0],
