@@ -1,6 +1,7 @@
 // @ts-ignore FIXME add types to library
 import { DwarfClient } from 'dfhack-remote'
 
+/* Useful types, and Protobuf types */
 type UInt3 = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 type ColorID = 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15
 type UInt8 =
@@ -21,6 +22,15 @@ type UInt8 =
     224|225|226|227|228|229|230|231|232|233|234|235|236|237|238|239|
     240|241|242|243|244|245|246|247|248|249|250|251|252|253|254|255
 type TileCharID = UInt8
+
+type BlockReq = {
+    minX: number,
+    maxX: number,
+    minY: number,
+    maxY: number,
+    minZ: number,
+    maxZ: number,
+}
 
 const tiles = getTiles()
 const TILE_HIDDEN = null
@@ -143,16 +153,7 @@ const getRelativeCoords = (index: number): {x: number, y: number, z: number} => 
 
 // HACK
 const getColorIdFromProfessionID = (prfID: number): ColorID => {
-    return prfID % 16 as ColorID
-}
-
-type BlockReq = {
-    minX: number,
-    maxX: number,
-    minY: number,
-    maxY: number,
-    minZ: number,
-    maxZ: number,
+    return 1 + (prfID % 15) as ColorID
 }
 
 /** HACK fix block request range, to avoid blank border issue */
@@ -168,7 +169,7 @@ const fixBlockRequest = (blkReq: BlockReq): BlockReq => {
 }
 
 /** Update {@link mapBlock} with values from IO */
-const updateBlockMap = (blockList: any, unitList: any, creatureRaws: any) => {
+const updateBlockMap = (blockList: any, unitList: Array<any>, creatureRaws: Array<any>) => {
     if (blockList.mapBlocks != undefined) {
         for (const mapBlock of blockList.mapBlocks) {
             if (mapBlock.tiles != undefined) {
@@ -333,18 +334,19 @@ const updateCanvas = async (df : DwarfClient, ctx: CanvasRenderingContext2D) => 
     paintTiles(ctx)
 }
 
+/** Load descriptions from DF */
 async function useClient (df: DwarfClient, ctx: CanvasRenderingContext2D) {
     try {
         await df.ready()
         console.log('new DwarfClient:', df)
         await df.ResetMapHashes()
-        let blockList = await df.GetBlockList(
+        const blockList = await df.GetBlockList(
             {'minX': 1, 'minY': 1, 'minZ': 150, 'maxX': 9, 'maxY': 9, 'maxZ': 160}
         )
         tiletypeList = (await df.GetTiletypeList()).tiletypeList
         matList = (await df.GetMaterialList()).materialList
-        const unitList = (await df.GetUnitList()).creatureList
         creatureRaws =  (await df.GetCreatureRaws()).creatureRaws
+        const unitList = (await df.GetUnitList()).creatureList
 
         updateBlockMap(blockList, unitList, creatureRaws)
 
