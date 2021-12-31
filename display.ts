@@ -23,6 +23,44 @@ type UInt8 =
     240|241|242|243|244|245|246|247|248|249|250|251|252|253|254|255
 type TileCharID = UInt8
 
+/* SDL input constants */
+const enum EventType {
+    ET_NOEVENT = 0,         /**< Unused (do not remove) */
+    ET_ACTIVEEVENT,         /**< Application loses/gains visibility */
+    ET_KEYDOWN,             /**< Keys pressed */
+    ET_KEYUP,               /**< Keys released */
+    // etc
+}
+const enum ButtonState {
+    BTN_RELEASED = 0,
+    BTN_PRESSED = 1
+}
+const enum Mod {
+    KMOD_NONE = 0x0000,
+    KMOD_LSHIFT = 0x0001,
+    KMOD_RSHIFT = 0x0002,
+    KMOD_LCTRL = 0x0040,
+    KMOD_RCTRL = 0x0080,
+    KMOD_LALT = 0x0100,
+    KMOD_RALT = 0x0200,
+    KMOD_LMETA = 0x0400,
+    KMOD_RMETA = 0x0800,
+    KMOD_NUM = 0x1000,
+    KMOD_CAPS = 0x2000,
+    KMOD_MODE = 0x4000,
+    KMOD_RESERVED = 0x8000,
+    KMOD_CTRL = (KMOD_LCTRL | KMOD_RCTRL),
+    KMOD_SHIFT = (KMOD_LSHIFT | KMOD_RSHIFT),
+    KMOD_ALT = (KMOD_LALT | KMOD_RALT),
+    KMOD_META = (KMOD_LMETA | KMOD_RMETA)
+}
+
+/** Protobuf type */
+type ScreenCap = {
+    width: number,
+    height: number,
+    tiles: { character: TileCharID, foreground: ColorID, background: ColorID }[]
+}
 type BlockReq = {
     minX: number,
     maxX: number,
@@ -113,8 +151,8 @@ const resizeView = () => {
     viewWidth = Math.floor(canvas.width / pSize)
     viewHeight = Math.floor(canvas.height / pSize)
 }
-
 const cursor = {'x': 0, 'y': 0}
+let syncCameraMode = false  // TODO initialize from select
 
 let df: DwarfClient
 let creatureRaws: Array<any>
@@ -260,7 +298,25 @@ const writeTile = (
     )
 }
 
-const paintTiles = (ctx: CanvasRenderingContext2D) => {
+/** Adjust view and repaint synced tiles */
+const repaintSyncedScreen = (ctx: CanvasRenderingContext2D, sc: ScreenCap) => {
+    ctx.canvas.width = sc.width * pxPerAtlasTileW
+    ctx.canvas.height = sc.height * pxPerAtlasTileH
+    ctx.fillStyle = '#000000'
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+    if (sc.width * sc.height !== sc.tiles.length) {
+        console.warn(`ScreenCap length ${sc.tiles.length} != ${sc.width}x${sc.height}`)
+    }
+    sc.tiles.forEach((tile, i) => {
+        const yi = i % sc.height
+        const xi = Math.floor(i / sc.height)
+        writeBgTile(ctx, xi, yi, tile.background)
+        writeTile(ctx, tile.character, xi, yi, tile.foreground)
+    })
+}
+
+/** Paint canvas, using cached blocks */
+const paintCachedTiles = (ctx: CanvasRenderingContext2D, blockMap: Block[][][]) => {
     ctx.fillStyle = '#000000'
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
     // render all tiles in view
@@ -331,7 +387,12 @@ const updateCanvas = async (df : DwarfClient, ctx: CanvasRenderingContext2D) => 
     const blockList = await df.GetBlockList(blockRequest)
     const unitList: Array<any> = (await df.GetUnitList()).creatureList
     updateBlockMap(blockList, unitList, creatureRaws)
-    paintTiles(ctx)
+    paintCachedTiles(ctx, blockMap)
+}
+
+/** Poll the server's view, paint it */
+const refreshSyncedTiles = async (df: DwarfClient, ctx: CanvasRenderingContext2D) => {
+    repaintSyncedScreen(ctx, await df.CopyScreen())
 }
 
 /** Load descriptions from DF */
@@ -350,7 +411,7 @@ async function useClient (df: DwarfClient, ctx: CanvasRenderingContext2D) {
 
         updateBlockMap(blockList, unitList, creatureRaws)
 
-        paintTiles(ctx)
+        paintCachedTiles(ctx, blockMap)
         console.log(blockMap)
     } catch (e) {
         console.error('DwarfClient error:', e)
@@ -392,55 +453,79 @@ const updateCaption = (caption: HTMLDivElement) => {
 const bindKVMControls = (
     canvas: HTMLCanvasElement,
     caption: HTMLDivElement,
-    refreshView: () => void,
+    camMode: HTMLSelectElement,
+    loadRepaintView: () => void,
     repaintView: () => void,
 ) => {
     canvas.addEventListener('keydown', e => {
-        const key : String = e.key
-        if (key === '<') {
-            viewZ++
-            refreshView()
-        } else if (key === '>') {
-            viewZ--
-            refreshView()
-        } else if (key === 'ArrowUp') {
-            if (viewMinY >= 16) {
-                viewMinY -= 16
-            } else {
-                viewMinY -= viewMinY
+        const key: String = e.key
+        if (syncCameraMode) {
+            // TODO send keystroke to game
+            df.PassKeyboardEvent({
+                type: EventType.ET_KEYDOWN,
+                which: 0,
+                state: ButtonState.BTN_PRESSED,
+                scancode: e.keyCode,
+                sym: null, // FIXME SDL key code,
+                // FIXME left vs right
+                mod: (Mod.KMOD_SHIFT * +e.shiftKey)
+                    | (Mod.KMOD_CTRL & +e.ctrlKey)
+                    | (Mod.KMOD_ALT & +e.altKey)
+                    | (Mod.KMOD_META & +e.metaKey),
+                unicode: key.charCodeAt(0)
+            })
+        } else {
+            if (key === '<') {
+                viewZ++
+                loadRepaintView()
+            } else if (key === '>') {
+                viewZ--
+                loadRepaintView()
+            } else if (key === 'ArrowUp') {
+                if (viewMinY >= 16) {
+                    viewMinY -= 16
+                } else {
+                    viewMinY -= viewMinY
+                }
+                loadRepaintView()
+            } else if (key === 'ArrowDown') {
+                if (viewMinY + viewHeight <= 176) {
+                    viewMinY += 16
+                } else {
+                    viewMinY += 192 - (viewMinY + viewHeight)
+                }
+                loadRepaintView()
+            } else if (key === 'ArrowLeft') {
+                if (viewMinX >= 16) {
+                    viewMinX -= 16
+                } else {
+                    viewMinX -= viewMinX
+                }
+                loadRepaintView()
+            } else if (key === 'ArrowRight') {
+                if (viewMinX + viewWidth <= 176) {
+                    viewMinX += 16
+                } else {
+                    viewMinX += 192 - (viewMinX + viewWidth)
+                }
+                loadRepaintView()
+            } else if (key === ' ') {
+                loadRepaintView()
             }
-            refreshView()
-        } else if (key === 'ArrowDown') {
-            if (viewMinY + viewHeight <= 176) {
-                viewMinY += 16
-            } else {
-                viewMinY += 192 - (viewMinY + viewHeight)
-            }
-            refreshView()
-        } else if (key === 'ArrowLeft') {
-            if (viewMinX >= 16) {
-                viewMinX -= 16
-            } else {
-                viewMinX -= viewMinX
-            }
-            refreshView()
-        } else if (key === 'ArrowRight') {
-            if (viewMinX + viewWidth <= 176) {
-                viewMinX += 16
-            } else {
-                viewMinX += 192 - (viewMinX + viewWidth)
-            }
-            refreshView()
-        } else if (key === ' ') {
-            refreshView()
+            updateCaption(caption)
         }
-        updateCaption(caption)
     })
 
     canvas.addEventListener('mousemove', e => {
         cursor.x = Math.floor(e.offsetX / pSize)
         cursor.y = Math.floor(e.offsetY / pSize)
         updateCaption(caption)
+    })
+
+    camMode.addEventListener('change', function (e) {
+        syncCameraMode = this.selectedIndex > 0
+        // TODO trigger repaint
+        canvas.focus()
     })
 
     window.addEventListener('resize', e => {
@@ -470,7 +555,11 @@ async function main () {
     if (ctx == null) throw new Error('CanvasRenderingContext2D unavailable: ' + canvas)
     {
         const caption = document.getElementById('caption') as HTMLDivElement
-        bindKVMControls(canvas, caption, () => updateCanvas(df, ctx), () => paintTiles(ctx))
+        const camMode = document.getElementById('viewMode') as HTMLSelectElement
+        bindKVMControls(
+            canvas, caption, camMode,
+            () => updateCanvas(df, ctx), () => paintCachedTiles(ctx, blockMap)
+        )
     }
     canvas.focus()
 
