@@ -221,7 +221,7 @@ const posIsInView = (posX: number, posY: number, posZ: number): boolean => {
     )
 }
 
-/** Convert global coordinates to BlockList's 0-16 sub-block coords */
+/** Get coords from a BlockList's 16x16x1 sub-block index */
 const getRelativeCoords = (index: number): {x: number, y: number, z: number} => {
     return {x: index % 16, y: Math.floor(index / 16), z: 0}
 }
@@ -418,7 +418,7 @@ async function useClient (df: DwarfClient, ctx: CanvasRenderingContext2D) {
         await df.ready()
         console.log('new DwarfClient:', df)
         await df.ResetMapHashes()
-        const blockList = await df.GetBlockList(
+        const blockList = await df.GetBlockList( // FIXME hardcoded map dims
             {'minX': 1, 'minY': 1, 'minZ': 150, 'maxX': 9, 'maxY': 9, 'maxZ': 160}
         )
         tiletypeList = (await df.GetTiletypeList()).tiletypeList
@@ -450,7 +450,7 @@ const updateCaption = (caption: HTMLDivElement) => {
             const tileID = block.tileID
             const itemData = block.itemData
             const units = block.unit
-            if (tileID != null) caption.textContent += ', ' +  tiletypeList[tileID].caption
+            if (tileID != null) caption.textContent += `, ${tiletypeList[tileID].caption}`
             if (itemData != undefined) {
                 const mat = itemData.material
                 caption.textContent += ', ' + matList.filter(e =>
@@ -459,10 +459,10 @@ const updateCaption = (caption: HTMLDivElement) => {
             if (units != undefined && units.unit.length !== 0) {
                 for (const unit of units.unit) {
                     if (unit.name !== undefined) {
-                        caption.textContent += ', ' + unit.name
-                        caption.textContent += ' (' + creatureRaws[unit.race.matType].name[0] + ')'
+                        caption.textContent += `, ${unit.name}`
+                        caption.textContent += ` (${creatureRaws[unit.race.matType].name[0]})`
                     } else {
-                        caption.textContent += ', ' + creatureRaws[unit.race.matType].name[0]
+                        caption.textContent += `, ${creatureRaws[unit.race.matType].name[0]}`
                     }
                 }
             }
