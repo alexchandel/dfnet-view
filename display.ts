@@ -108,34 +108,60 @@ const COLOR_SCHEME_STR = COLOR_SCHEME.map(
     rgb => '#' + rgb.map(n => n.toString(16).padStart(2, '0')).join('')
 )
 
-/** Cache of colored atlases, for all 16 colors. */
-let coloredAtlases: HTMLCanvasElement[]
-/** Length of tileset squares */
-let pxPerAtlasTileW: number
-let pxPerAtlasTileH: number
+class TileWriter {
+    /** Cache of colored atlases, for all 16 colors. */
+    readonly coloredAtlases: HTMLCanvasElement[]
+    /** Width of tileset tiles */
+    public readonly pxPerAtlasTileW: number
+    /** Height of tileset tiles */
+    public readonly pxPerAtlasTileH: number
 
-/** Initialize colored atlases after load */
-const initializeAtlases = () => {
-    /** Tileset image from DF. */
-    const tileAtlas = document.getElementById('tileset') as HTMLImageElement
-    pxPerAtlasTileW = tileAtlas.naturalWidth / 16
-    pxPerAtlasTileH = tileAtlas.naturalHeight / 16
+    /**
+     * @param tileAtlas 256-char rectangular tileset image, from DF.
+     */
+    constructor(tileAtlas: HTMLImageElement) {
+        this.pxPerAtlasTileW = tileAtlas.naturalWidth / 16
+        this.pxPerAtlasTileH = tileAtlas.naturalHeight / 16
+        /* Pre-cache colored atlases for later. */
+        this.coloredAtlases = COLOR_SCHEME_STR.map((rgbstr, i) => {
+            const newAtlas = document.createElement('canvas')
+            newAtlas.width = tileAtlas.width
+            newAtlas.height = tileAtlas.height
+            {
+                const newContext = newAtlas.getContext('2d')
+                if (newContext == null) throw new Error('CanvasRenderingContext2D unavailable: ' + newAtlas)
+                newContext.drawImage(tileAtlas, 0, 0)
+                newContext.globalCompositeOperation = 'source-in'
+                newContext.fillStyle = rgbstr
+                newContext.fillRect(0, 0, newAtlas.width, newAtlas.height)
+            }
+            return newAtlas
+        })
+    }
 
-    coloredAtlases = COLOR_SCHEME_STR.map((rgbstr, i) => {
-        const newAtlas = document.createElement('canvas')
-        newAtlas.width = tileAtlas.width
-        newAtlas.height = tileAtlas.height
-        {
-            const newContext = newAtlas.getContext('2d')
-            if (newContext == null) throw new Error('CanvasRenderingContext2D unavailable: ' + newAtlas)
-            newContext.drawImage(tileAtlas, 0, 0)
-            newContext.globalCompositeOperation = 'source-in'
-            newContext.fillStyle = rgbstr
-            newContext.fillRect(0, 0, newAtlas.width, newAtlas.height)
-        }
-        return newAtlas
-    })
+    /**
+     * Stamp a colored tile from the tileset.
+     */
+    public writeTile (
+        context: CanvasRenderingContext2D,
+        tileCharID: TileCharID, xi: number, yi: number, fgc: ColorID
+    ) {
+        context.drawImage(
+            this.coloredAtlases[fgc], // image
+            this.pxPerAtlasTileW * (tileCharID % 16), // source x
+            this.pxPerAtlasTileH * Math.floor(tileCharID / 16), // source y
+            this.pxPerAtlasTileW, // source width
+            this.pxPerAtlasTileH, // source height
+
+            pSize * xi, // target x
+            pSize * yi, // target y
+            pSize, // target width
+            pSize // target height
+        )
+    }
 }
+
+let tileWriter: TileWriter
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement
 
@@ -288,31 +314,11 @@ const writeBgTile = (
     context.fillStyle = COLOR_SCHEME_STR[bgc]
     context.fillRect(pSize * xi, pSize * yi, pSize, pSize)
 }
-/**
- * Stamp a colored tile from the tileset.
- */
-const writeTile = (
-    context: CanvasRenderingContext2D,
-    tileCharID: TileCharID, xi: number, yi: number, fgc: ColorID
-) => {
-    context.drawImage(
-        coloredAtlases[fgc], // image
-        pxPerAtlasTileW * (tileCharID % 16), // source x
-        pxPerAtlasTileH * Math.floor(tileCharID / 16), // source y
-        pxPerAtlasTileW, // source width
-        pxPerAtlasTileH, // source height
-
-        pSize * xi, // target x
-        pSize * yi, // target y
-        pSize, // target width
-        pSize // target height
-    )
-}
 
 /** Adjust view and repaint synced tiles */
 const repaintSyncedScreen = (ctx: CanvasRenderingContext2D, sc: ScreenCap) => {
-    ctx.canvas.width = sc.width * pxPerAtlasTileW
-    ctx.canvas.height = sc.height * pxPerAtlasTileH
+    ctx.canvas.width = sc.width * tileWriter.pxPerAtlasTileW
+    ctx.canvas.height = sc.height * tileWriter.pxPerAtlasTileH
     ctx.fillStyle = '#000000'
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
     if (sc.width * sc.height !== sc.tiles.length) {
@@ -322,7 +328,7 @@ const repaintSyncedScreen = (ctx: CanvasRenderingContext2D, sc: ScreenCap) => {
         const yi = i % sc.height
         const xi = Math.floor(i / sc.height)
         writeBgTile(ctx, xi, yi, tile.background)
-        writeTile(ctx, tile.character, xi, yi, tile.foreground)
+        tileWriter.writeTile(ctx, tile.character, xi, yi, tile.foreground)
     })
 }
 
@@ -364,20 +370,20 @@ const paintCachedTiles = (ctx: CanvasRenderingContext2D, blockMap: Block[][][]) 
             if (tile.tileID === TILE_HIDDEN) {
                 // hidden
             } else if (tile.unit.unit.length !== 0) {
-                writeTile(ctx, tile.unit.char[0][0], j, i, tile.unit.char[0][1])
+                tileWriter.writeTile(ctx, tile.unit.char[0][0], j, i, tile.unit.char[0][1])
             } else if (tile.item !== undefined) {
-                writeTile(ctx, tile.item[0], j, i, tile.item[1])
+                tileWriter.writeTile(ctx, tile.item[0], j, i, tile.item[1])
             } else if (tile.building !== undefined) {
                 // TODO
             } else if (tile.water !== 0) {
-                writeTile(ctx, (48 + tile.water) as TileCharID, j, i, 1)
+                tileWriter.writeTile(ctx, (48 + tile.water) as TileCharID, j, i, 1)
             } else if (tile.magma !== 0) {
-                writeTile(ctx, (48 + tile.magma) as TileCharID, j, i, 5)
+                tileWriter.writeTile(ctx, (48 + tile.magma) as TileCharID, j, i, 5)
             } else if (tile.vein !== undefined) {
                 // TODO
             } else if (tile.tileID != null && tile.tile != null) {
                 // regular tile
-                writeTile(ctx, tile.tile[0], j, i, tile.tile[1])
+                tileWriter.writeTile(ctx, tile.tile[0], j, i, tile.tile[1])
             } else {
                 console.warn('Unknown block case')
             }
@@ -561,7 +567,7 @@ async function main () {
     df = new DwarfClient()
     /* @ts-ignore FIXME Debugging assignments */
     window['df'] = df
-    initializeAtlases()
+    tileWriter = new TileWriter(document.getElementById('tileset') as HTMLImageElement)
     resizeView()
 
     const ctx = canvas.getContext('2d')
