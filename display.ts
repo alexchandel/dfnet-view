@@ -484,9 +484,9 @@ const bindKVMControls = (
                 sym: null, // FIXME SDL key code,
                 // FIXME left vs right
                 mod: (Mod.KMOD_SHIFT * +e.shiftKey)
-                    | (Mod.KMOD_CTRL & +e.ctrlKey)
-                    | (Mod.KMOD_ALT & +e.altKey)
-                    | (Mod.KMOD_META & +e.metaKey),
+                    | (Mod.KMOD_CTRL * +e.ctrlKey)
+                    | (Mod.KMOD_ALT * +e.altKey)
+                    | (Mod.KMOD_META * +e.metaKey),
                 unicode: key.charCodeAt(0)
             })
         } else {
