@@ -135,7 +135,7 @@ const initializeAtlases = () => {
     })
 }
 
-const canvas = <HTMLCanvasElement> document.getElementById('canvas')
+const canvas = document.getElementById('canvas') as HTMLCanvasElement
 
 const pSize: number = 15
 let viewWidth: number = 1 // dummy value, before resizeView() is called
@@ -178,6 +178,7 @@ let blockMap: Block[][][] = []
 //     return '#' + r + g + b
 // }
 
+/** Check if point is in viewport */
 const posIsInView = (posX: number, posY: number, posZ: number): boolean => {
     return (
         posZ === viewZ && posX >= viewMinX && posX < viewMinX + viewWidth
@@ -185,11 +186,12 @@ const posIsInView = (posX: number, posY: number, posZ: number): boolean => {
     )
 }
 
+/** Convert global coordinates to BlockList's 0-16 sub-block coords */
 const getRelativeCoords = (index: number): {x: number, y: number, z: number} => {
     return {x: index % 16, y: Math.floor(index / 16), z: 0}
 }
 
-// HACK
+/** HACK Look up color for unit's profession */
 const getColorIdFromProfessionID = (prfID: number): ColorID => {
     return 1 + (prfID % 15) as ColorID
 }
@@ -413,6 +415,8 @@ async function useClient (df: DwarfClient, ctx: CanvasRenderingContext2D) {
 
         paintCachedTiles(ctx, blockMap)
         console.log(blockMap)
+
+        // TODO start screen updates
     } catch (e) {
         console.error('DwarfClient error:', e)
     } finally {
@@ -422,6 +426,7 @@ async function useClient (df: DwarfClient, ctx: CanvasRenderingContext2D) {
     }
 }
 
+/** Update caption, polling viewport and block cache. */
 const updateCaption = (caption: HTMLDivElement) => {
     caption.textContent = 'x: ' + (viewMinX + cursor.x) + ' y: ' + (viewMinY + cursor.y)
     if (blockMap[viewZ] !== undefined && blockMap[viewZ][(viewMinY + cursor.y)] !== undefined) {
@@ -450,6 +455,7 @@ const updateCaption = (caption: HTMLDivElement) => {
     }
 }
 
+/** Install controls onto GUI */
 const bindKVMControls = (
     canvas: HTMLCanvasElement,
     caption: HTMLDivElement,
@@ -571,6 +577,7 @@ window['main'] = main
 
 document.readyState == 'complete' ? main() : window.addEventListener('load', main)
 
+/** Item char from item ID, haphazardly */
 function getItemChar (itemTypeID: number): TileCharID {
     switch (itemTypeID) {
         case 3:
@@ -594,6 +601,7 @@ function getItemChar (itemTypeID: number): TileCharID {
     }
 }
 
+/** Tile char from ID, https://dwarffortresswiki.org/index.php/DF2014:Tile_types_in_DF_memory */
 function getTiles (): ([TileCharID, ColorID, ColorID] | null)[] {
     return [
         [255, 0, 0],
