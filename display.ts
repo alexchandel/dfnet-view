@@ -550,11 +550,7 @@ const bindKVMControls = (
     })
 
     window.addEventListener('resize', e => {
-        const rect = canvas.getBoundingClientRect()
-        canvas.width = rect.width
-        canvas.height = rect.height
-        viewWidth = Math.floor(canvas.width / pSize)
-        viewHeight = Math.floor(canvas.height / pSize)
+        resizeView()
         repaintView()  // FIXME refresh if too big?
     })
 }
