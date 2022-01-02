@@ -31,10 +31,12 @@ const enum EventType {
     ET_KEYUP,               /**< Keys released */
     // etc
 }
+/** SDL button states */
 const enum ButtonState {
     BTN_RELEASED = 0,
     BTN_PRESSED = 1
 }
+/** SDL keycode modifers */
 const enum Mod {
     KMOD_NONE = 0x0000,
     KMOD_LSHIFT = 0x0001,
@@ -137,10 +139,15 @@ const initializeAtlases = () => {
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement
 
+/** Actual side-length of tile squares in viewport */
 const pSize: number = 15
+/** Number of columns in viewport */
 let viewWidth: number = 1 // dummy value, before resizeView() is called
+/** Number of rows in viewport */
 let viewHeight: number = 1 // dummy value, before resizeView() is called
+/** X-coordinate of top-left tile in viewport */
 let viewMinX: number = 80
+/** Y-coordinate of top-left tile in viewport */
 let viewMinY: number = 80
 let viewZ: number = 158
 /** Update canvas dimensions after any resize. Should be followed by a repaint. */
@@ -151,7 +158,9 @@ const resizeView = () => {
     viewWidth = Math.floor(canvas.width / pSize)
     viewHeight = Math.floor(canvas.height / pSize)
 }
+/** Location of last hovered tile in viewport */
 const cursor = {'x': 0, 'y': 0}
+/** Whether to sync the viewport with the server */
 let syncCameraMode = false  // TODO initialize from select
 
 let df: DwarfClient
