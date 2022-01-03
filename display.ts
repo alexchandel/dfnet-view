@@ -63,6 +63,20 @@ type ScreenCap = {
     height: number,
     tiles: { character: TileCharID, foreground: ColorID, background: ColorID }[]
 }
+type MapBlock = {
+    mapX: number,
+    mapY: number,
+    mapZ: number,
+    tiles?: number[],
+    magma?: number[],
+    water?: number[],
+    hidden?: boolean[],
+    items?: any[]
+}
+type BlockList = {
+    mapBlocks?: MapBlock[]
+}
+/** Narrowed Protobuf type */
 type BlockReq = {
     minX: number,
     maxX: number,
@@ -71,11 +85,17 @@ type BlockReq = {
     minZ: number,
     maxZ: number,
 }
-
-const tiles = getTiles()
-const TILE_HIDDEN = null
-const TILE_VOID = 0
-const TILE_EMPTY = 0x20
+/** HACK fix block request range, to avoid blank border issue */
+const fixBlockRequest = (blkReq: BlockReq): BlockReq => {
+    const correct: Map<number, number> = new Map([[4, 7], [3, 7], [2, 5], [1, 5], [0, 3]])
+    const newX = correct.get(blkReq.minY) ?? blkReq.minX
+    const newY = correct.get(blkReq.minX) ?? blkReq.minY
+    const newMinX = (blkReq.minY <= 4 && blkReq.minX > newX) ? newX : blkReq.minX
+    const newMinY = (blkReq.minX <= 4 && blkReq.minY > newY) ? newY : blkReq.minY
+    blkReq.minX = newMinX
+    blkReq.minY = newMinY
+    return blkReq
+}
 
 /**
  * The 16 color names are:
@@ -101,12 +121,25 @@ const COLOR_SCHEME: UInt8[][] = [
     [255, 255, 255],
 ]
 
-/**
- * Cache of the RGB style strings, for the 16 colors.
- */
+/** Cache of the RGB style strings, for the 16 colors. */
 const COLOR_SCHEME_STR = COLOR_SCHEME.map(
     rgb => '#' + rgb.map(n => n.toString(16).padStart(2, '0')).join('')
 )
+
+const tileStyles = getTiles()
+const TILE_HIDDEN = null
+const TILE_VOID = 0
+const TILE_EMPTY = 0x20
+
+/** HACK Look up color for unit's profession */
+const getColorIdFromProfessionID = (prfID: number): ColorID => {
+    return 1 + (prfID % 15) as ColorID
+}
+
+/** Get coords from a BlockList's 16x16x1 sub-block index */
+const getRelativeCoords = (index: number): { x: number, y: number, z: number } => {
+    return { x: index % 16, y: Math.floor(index / 16), z: 0 }
+}
 
 class TileWriter {
     /** Cache of colored atlases, for all 16 colors. */
@@ -190,9 +223,11 @@ const cursor = {'x': 0, 'y': 0}
 let syncCameraMode = false  // TODO initialize from select
 
 let df: DwarfClient
+/* Loaded definitions */
 let creatureRaws: Array<any>
 let tiletypeList: Array<any>
 let matList: Array<any>
+
 type Block = {
     tile: [TileCharID, ColorID, ColorID] | null,
     tileID: number | null,
@@ -201,17 +236,10 @@ type Block = {
     building?: number,
     vein?: number,
     item?: [TileCharID, ColorID, ColorID]
-    itemData?: any,
+    itemData?: {material: any},
     unit: {unit: any[], char: any[]},
 }
 let blockMap: Block[][][] = []
-
-// const rgbToHex = (rgb : Array<number>) => {
-//     const r: String = rgb[0].toString(16).padStart(2, '0')
-//     const g: String = rgb[1].toString(16).padStart(2, '0')
-//     const b: String = rgb[2].toString(16).padStart(2, '0')
-//     return '#' + r + g + b
-// }
 
 /** Check if point is in viewport */
 const posIsInView = (posX: number, posY: number, posZ: number): boolean => {
@@ -221,53 +249,31 @@ const posIsInView = (posX: number, posY: number, posZ: number): boolean => {
     )
 }
 
-/** Get coords from a BlockList's 16x16x1 sub-block index */
-const getRelativeCoords = (index: number): {x: number, y: number, z: number} => {
-    return {x: index % 16, y: Math.floor(index / 16), z: 0}
-}
-
-/** HACK Look up color for unit's profession */
-const getColorIdFromProfessionID = (prfID: number): ColorID => {
-    return 1 + (prfID % 15) as ColorID
-}
-
-/** HACK fix block request range, to avoid blank border issue */
-const fixBlockRequest = (blkReq: BlockReq): BlockReq => {
-    const correct: Map<number, number> = new Map([[4, 7], [3, 7], [2, 5], [1, 5], [0, 3]])
-    const newX = correct.get(blkReq.minY) ?? blkReq.minX
-    const newY = correct.get(blkReq.minX) ?? blkReq.minY
-    const newMinX = (blkReq.minY <= 4 && blkReq.minX > newX) ? newX : blkReq.minX
-    const newMinY = (blkReq.minX <= 4 && blkReq.minY > newY) ? newY : blkReq.minY
-    blkReq.minX = newMinX
-    blkReq.minY = newMinY
-    return blkReq
-}
-
 /** Update {@link mapBlock} with values from IO */
-const updateBlockMap = (blockList: any, unitList: Array<any>, creatureRaws: Array<any>) => {
-    if (blockList.mapBlocks != undefined) {
+const updateBlockMap = (blockList: BlockList, unitList: Array<any>, creatureRaws: Array<any>) => {
+    if (blockList.mapBlocks != null) {
         for (const mapBlock of blockList.mapBlocks) {
-            if (mapBlock.tiles != undefined) {
-                mapBlock.tiles.forEach((tileID: number, i: number) => {
+            if (mapBlock.tiles != null) {
+                mapBlock.tiles.forEach((tileID, i) => {
                     const relCoords = getRelativeCoords(i)
                     const coords = {
                         x: mapBlock.mapX + relCoords.x,
                         y: mapBlock.mapY + relCoords.y,
                         z: mapBlock.mapZ + relCoords.z
                     }
-                    if (blockMap[coords.z] == undefined) {
+                    if (!blockMap[coords.z]) {
                         blockMap[coords.z] = []
                     }
-                    if (blockMap[coords.z][coords.y] == undefined) {
+                    if (!blockMap[coords.z][coords.y]) {
                         blockMap[coords.z][coords.y] = []
                     }
-                    const isHidden = mapBlock.hidden[i]
+                    const isHidden = mapBlock.hidden && mapBlock.hidden[i]
                     // FIXME check if ID in tiles list
                     blockMap[coords.z][coords.y][coords.x] = {
-                        tile: tiles[isHidden ? TILE_VOID : tileID],
+                        tile: tileStyles[isHidden ? TILE_VOID : tileID],
                         tileID: isHidden ? TILE_HIDDEN : tileID,
-                        water: mapBlock.water[i] || 0,
-                        magma: mapBlock.magma[i] || 0,
+                        water: mapBlock.water ? (mapBlock.water[i] || 0) as UInt3 : 0,
+                        magma: mapBlock.magma ? (mapBlock.magma[i] || 0) as UInt3 : 0,
                         unit: { unit: [], char: [] },
                     }
                 })
@@ -451,19 +457,17 @@ const updateCaption = (caption: HTMLDivElement) => {
             const itemData = block.itemData
             const units = block.unit
             if (tileID != null) caption.textContent += `, ${tiletypeList[tileID].caption}`
-            if (itemData != undefined) {
+            if (itemData) {
                 const mat = itemData.material
                 caption.textContent += ', ' + matList.filter(e =>
                     e.matPair.matType === mat.matType && e.matPair.matIndex === mat.matIndex)[0].name
             }
-            if (units != undefined && units.unit.length !== 0) {
-                for (const unit of units.unit) {
-                    if (unit.name !== undefined) {
-                        caption.textContent += `, ${unit.name}`
-                        caption.textContent += ` (${creatureRaws[unit.race.matType].name[0]})`
-                    } else {
-                        caption.textContent += `, ${creatureRaws[unit.race.matType].name[0]}`
-                    }
+            for (const unit of units.unit) {
+                if (unit.name != null) {
+                    caption.textContent += `, ${unit.name}`
+                    caption.textContent += ` (${creatureRaws[unit.race.matType].name[0]})`
+                } else {
+                    caption.textContent += `, ${creatureRaws[unit.race.matType].name[0]}`
                 }
             }
         }
