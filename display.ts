@@ -141,6 +141,14 @@ const getRelativeCoords = (index: number): { x: number, y: number, z: number } =
     return { x: index % 16, y: Math.floor(index / 16), z: 0 }
 }
 
+/** Color background of a tile. */
+const writeBgTile = (
+    context: CanvasRenderingContext2D, xi: number, yi: number, pSize: number, bgc: ColorID
+) => {
+    context.fillStyle = COLOR_SCHEME_STR[bgc]
+    context.fillRect(pSize * xi, pSize * yi, pSize, pSize)
+}
+
 class TileWriter {
     /** Cache of colored atlases, for all 16 colors. */
     readonly coloredAtlases: HTMLCanvasElement[]
@@ -177,7 +185,7 @@ class TileWriter {
      */
     public writeTile (
         context: CanvasRenderingContext2D,
-        tileCharID: TileCharID, xi: number, yi: number, fgc: ColorID
+        tileCharID: TileCharID, xi: number, yi: number, pSize: number, fgc: ColorID
     ) {
         context.drawImage(
             this.coloredAtlases[fgc], // image
@@ -196,29 +204,53 @@ class TileWriter {
 
 let tileWriter: TileWriter
 
-const canvas = document.getElementById('canvas') as HTMLCanvasElement
+class Viewport {
+    /** Actual side-length of tile squares in viewport */
+    public readonly pSize: number = 15
+    /** Number of columns in viewport */
+    public viewWidth: number = 1 // dummy value, before resizeView() is called
+    /** Number of rows in viewport */
+    public viewHeight: number = 1 // dummy value, before resizeView() is called
+    /** X-coordinate of top-left tile in viewport */
+    public viewMinX: number = 80
+    /** Y-coordinate of top-left tile in viewport */
+    public viewMinY: number = 80
+    /** Z-coordinate of top-left tile in viewport */
+    public viewZ: number = 158
 
-/** Actual side-length of tile squares in viewport */
-const pSize: number = 15
-/** Number of columns in viewport */
-let viewWidth: number = 1 // dummy value, before resizeView() is called
-/** Number of rows in viewport */
-let viewHeight: number = 1 // dummy value, before resizeView() is called
-/** X-coordinate of top-left tile in viewport */
-let viewMinX: number = 80
-/** Y-coordinate of top-left tile in viewport */
-let viewMinY: number = 80
-let viewZ: number = 158
-/** Update canvas dimensions after any resize. Should be followed by a repaint. */
-const resizeView = () => {
-    const rect = canvas.getBoundingClientRect()
-    canvas.width = rect.width
-    canvas.height = rect.height
-    viewWidth = Math.floor(canvas.width / pSize)
-    viewHeight = Math.floor(canvas.height / pSize)
+    /** Location of last hovered tile in viewport */
+    public cursor = { x: 0, y: 0 }
+
+    /** Check if point is in viewport */
+    public posIsInView (posX: number, posY: number, posZ: number): boolean {
+        return (
+            posZ === this.viewZ && posX >= this.viewMinX && posX < this.viewMinX + this.viewWidth
+                && posY >= this.viewMinY && posY < this.viewMinY + this.viewHeight
+        )
+    }
+    /** Form request for GetBlockList */
+    public getRequest (): BlockReq {
+        return fixBlockRequest({
+            'minX': Math.max(Math.floor(this.viewMinX / 16), 0),
+            'minY': Math.max(Math.floor(this.viewMinY / 16), 0),
+            'minZ': this.viewZ,
+            'maxX': Math.max(Math.ceil((this.viewMinX + this.viewWidth) / 16), 12),
+            'maxY': Math.max(Math.ceil((this.viewMinY + this.viewHeight) / 16), 12),
+            'maxZ': this.viewZ + 1
+        })
+    }
+
+    /** Update canvas dimensions after any resize. Should be followed by a repaint. */
+    public resizeView (canvas: HTMLCanvasElement) {
+        const rect = canvas.getBoundingClientRect()
+        canvas.width = rect.width
+        canvas.height = rect.height
+        this.viewWidth = Math.floor(canvas.width / this.pSize)
+        this.viewHeight = Math.floor(canvas.height / this.pSize)
+    }
 }
-/** Location of last hovered tile in viewport */
-const cursor = {'x': 0, 'y': 0}
+
+const grid = new Viewport()
 /** Whether to sync the viewport with the server */
 let syncCameraMode = false  // TODO initialize from select
 
@@ -240,14 +272,6 @@ type Block = {
     unit: {unit: any[], char: any[]},
 }
 let blockMap: Block[][][] = []
-
-/** Check if point is in viewport */
-const posIsInView = (posX: number, posY: number, posZ: number): boolean => {
-    return (
-        posZ === viewZ && posX >= viewMinX && posX < viewMinX + viewWidth
-            && posY >= viewMinY && posY < viewMinY + viewHeight
-    )
-}
 
 /** Update {@link mapBlock} with values from IO */
 const updateBlockMap = (blockList: BlockList, unitList: Array<any>, creatureRaws: Array<any>) => {
@@ -288,13 +312,14 @@ const updateBlockMap = (blockList: BlockList, unitList: Array<any>, creatureRaws
             }
         }
         // adds unit/char to all visible blocks
-        blockMap[viewZ].slice(viewMinY, viewMinY + viewHeight).forEach((row, i) => {
-            row.slice(viewMinX, viewMinX + viewWidth).forEach((tile, j) => {
-                tile.unit = { unit: [], char: [] }
+        blockMap[grid.viewZ].slice(grid.viewMinY, grid.viewMinY + grid.viewHeight)
+            .forEach((row, i) => {
+                row.slice(grid.viewMinX, grid.viewMinX + grid.viewWidth).forEach((tile, j) => {
+                    tile.unit = { unit: [], char: [] }
+                })
             })
-        })
         for (const unit of unitList) {
-            if (posIsInView(unit.posX, unit.posY, unit.posZ)) {
+            if (grid.posIsInView(unit.posX, unit.posY, unit.posZ)) {
                 const block = blockMap[unit.posZ][unit.posY][unit.posX]
                 if (block.unit != undefined) {  // FIXME ensure this is defined
                     block.unit.unit.push(unit)
@@ -311,18 +336,8 @@ const updateBlockMap = (blockList: BlockList, unitList: Array<any>, creatureRaws
     }
 }
 
-/**
- * Color background of a tile.
- */
-const writeBgTile = (
-    context: CanvasRenderingContext2D, xi: number, yi: number, bgc: ColorID
-) => {
-    context.fillStyle = COLOR_SCHEME_STR[bgc]
-    context.fillRect(pSize * xi, pSize * yi, pSize, pSize)
-}
-
 /** Adjust view and repaint synced tiles */
-const repaintSyncedScreen = (ctx: CanvasRenderingContext2D, sc: ScreenCap) => {
+const paintSyncedScreen = (ctx: CanvasRenderingContext2D, sc: ScreenCap) => {
     ctx.canvas.width = sc.width * tileWriter.pxPerAtlasTileW
     ctx.canvas.height = sc.height * tileWriter.pxPerAtlasTileH
     ctx.fillStyle = '#000000'
@@ -333,8 +348,8 @@ const repaintSyncedScreen = (ctx: CanvasRenderingContext2D, sc: ScreenCap) => {
     sc.tiles.forEach((tile, i) => {
         const yi = i % sc.height
         const xi = Math.floor(i / sc.height)
-        writeBgTile(ctx, xi, yi, tile.background)
-        tileWriter.writeTile(ctx, tile.character, xi, yi, tile.foreground)
+        writeBgTile(ctx, xi, yi, grid.pSize, tile.background)
+        tileWriter.writeTile(ctx, tile.character, xi, yi, grid.pSize, tile.foreground)
     })
 }
 
@@ -343,70 +358,61 @@ const paintCachedTiles = (ctx: CanvasRenderingContext2D, blockMap: Block[][][]) 
     ctx.fillStyle = '#000000'
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
     // render all tiles in view
-    blockMap[viewZ].slice(viewMinY, viewMinY + viewHeight).forEach((row, i) => {
-        row.slice(viewMinX, viewMinX + viewWidth).forEach((tile, j) => {
-            let charDrawn: number
-            let backgroundDrawn: number
+    blockMap[grid.viewZ].slice(grid.viewMinY, grid.viewMinY + grid.viewHeight)
+        .forEach((row, i) => {
+            row.slice(grid.viewMinX, grid.viewMinX + grid.viewWidth).forEach((tile, j) => {
+                // pick which background to draw
+                if (tile.tileID === TILE_HIDDEN) {
+                    // hidden
+                } else if (tile.unit.unit.length !== 0) {
+                    const bgc = tile.unit.char[0][2]
+                    writeBgTile(ctx, j, i, grid.pSize, bgc)
+                    // no item case
+                } else if (tile.building !== undefined) {
+                    // TODO
+                } else if (tile.water !== 0) {
+                    const bgc = 0
+                    writeBgTile(ctx, j, i, grid.pSize, bgc)
+                } else if (tile.magma !== 0) {
+                    const bgc = 0
+                    writeBgTile(ctx, j, i, grid.pSize, bgc)
+                } else if (tile.vein !== undefined) {
+                    // TODO
+                } else if (tile.tileID != null && tile.tile != null) {
+                    // regular tile
+                    writeBgTile(ctx, j, i, grid.pSize, tile.tile[2])
+                } else {
+                    console.warn('Unknown block case')
+                }
 
-            // pick which background to draw
-            if (tile.tileID === TILE_HIDDEN) {
-                // hidden
-            } else if (tile.unit.unit.length !== 0) {
-                const bgc = tile.unit.char[0][2]
-                writeBgTile(ctx, j, i, bgc)
-                // no item case
-            } else if (tile.building !== undefined) {
-                // TODO
-            } else if (tile.water !== 0) {
-                const bgc = 0
-                writeBgTile(ctx, j, i, bgc)
-            } else if (tile.magma !== 0) {
-                const bgc = 0
-                writeBgTile(ctx, j, i, bgc)
-            } else if (tile.vein !== undefined) {
-                // TODO
-            } else if (tile.tileID != null && tile.tile != null) {
-                // regular tile
-                writeBgTile(ctx, j, i, tile.tile[2])
-            } else {
-                console.warn('Unknown block case')
-            }
-
-            // pick which char to draw (from unit, from item, etc) (only one)
-            if (tile.tileID === TILE_HIDDEN) {
-                // hidden
-            } else if (tile.unit.unit.length !== 0) {
-                tileWriter.writeTile(ctx, tile.unit.char[0][0], j, i, tile.unit.char[0][1])
-            } else if (tile.item !== undefined) {
-                tileWriter.writeTile(ctx, tile.item[0], j, i, tile.item[1])
-            } else if (tile.building !== undefined) {
-                // TODO
-            } else if (tile.water !== 0) {
-                tileWriter.writeTile(ctx, (48 + tile.water) as TileCharID, j, i, 1)
-            } else if (tile.magma !== 0) {
-                tileWriter.writeTile(ctx, (48 + tile.magma) as TileCharID, j, i, 5)
-            } else if (tile.vein !== undefined) {
-                // TODO
-            } else if (tile.tileID != null && tile.tile != null) {
-                // regular tile
-                tileWriter.writeTile(ctx, tile.tile[0], j, i, tile.tile[1])
-            } else {
-                console.warn('Unknown block case')
-            }
+                // pick which char to draw (from unit, from item, etc) (only one)
+                if (tile.tileID === TILE_HIDDEN) {
+                    // hidden
+                } else if (tile.unit.unit.length !== 0) {
+                    tileWriter.writeTile(ctx, tile.unit.char[0][0], j, i, grid.pSize, tile.unit.char[0][1])
+                } else if (tile.item !== undefined) {
+                    tileWriter.writeTile(ctx, tile.item[0], j, i, grid.pSize, tile.item[1])
+                } else if (tile.building !== undefined) {
+                    // TODO
+                } else if (tile.water !== 0) {
+                    tileWriter.writeTile(ctx, (48 + tile.water) as TileCharID, j, i, grid.pSize, 1)
+                } else if (tile.magma !== 0) {
+                    tileWriter.writeTile(ctx, (48 + tile.magma) as TileCharID, j, i, grid.pSize, 5)
+                } else if (tile.vein !== undefined) {
+                    // TODO
+                } else if (tile.tileID != null && tile.tile != null) {
+                    // regular tile
+                    tileWriter.writeTile(ctx, tile.tile[0], j, i, grid.pSize, tile.tile[1])
+                } else {
+                    console.warn('Unknown block case')
+                }
+            })
         })
-    })
 }
 
 /** Poll tiles in viewport, update cache, repaint */
 const updateCanvas = async (df : DwarfClient, ctx: CanvasRenderingContext2D) => {
-    const blockRequest: BlockReq = fixBlockRequest({
-        'minX': Math.max(Math.floor(viewMinX / 16), 0),
-        'minY': Math.max(Math.floor(viewMinY / 16), 0),
-        'minZ': viewZ,
-        'maxX': Math.max(Math.ceil((viewMinX + viewWidth) / 16), 12),
-        'maxY': Math.max(Math.ceil((viewMinY + viewHeight) / 16), 12),
-        'maxZ': viewZ + 1
-    })
+    const blockRequest = grid.getRequest()
     const blockList = await df.GetBlockList(blockRequest)
     const unitList: Array<any> = (await df.GetUnitList()).creatureList
     updateBlockMap(blockList, unitList, creatureRaws)
@@ -415,7 +421,7 @@ const updateCanvas = async (df : DwarfClient, ctx: CanvasRenderingContext2D) => 
 
 /** Poll the server's view, paint it */
 const refreshSyncedTiles = async (df: DwarfClient, ctx: CanvasRenderingContext2D) => {
-    repaintSyncedScreen(ctx, await df.CopyScreen())
+    paintSyncedScreen(ctx, await df.CopyScreen())
 }
 
 /** Load descriptions from DF */
@@ -449,10 +455,10 @@ async function useClient (df: DwarfClient, ctx: CanvasRenderingContext2D) {
 
 /** Update caption, polling viewport and block cache. */
 const updateCaption = (caption: HTMLDivElement) => {
-    caption.textContent = 'x: ' + (viewMinX + cursor.x) + ' y: ' + (viewMinY + cursor.y)
-    if (blockMap[viewZ] !== undefined && blockMap[viewZ][(viewMinY + cursor.y)] !== undefined) {
-        const block = blockMap[viewZ][(viewMinY + cursor.y)][(viewMinX + cursor.x)]
-        if (block !== undefined) {
+    caption.textContent = `x: ${grid.viewMinX + grid.cursor.x} y: ${grid.viewMinY + grid.cursor.y}`
+    if (blockMap[grid.viewZ] && blockMap[grid.viewZ][grid.viewMinY + grid.cursor.y]) {
+        const block = blockMap[grid.viewZ][grid.viewMinY + grid.cursor.y][grid.viewMinX + grid.cursor.x]
+        if (block) {
             const tileID = block.tileID
             const itemData = block.itemData
             const units = block.unit
@@ -501,37 +507,37 @@ const bindKVMControls = (
             })
         } else {
             if (key === '<') {
-                viewZ++
+                grid.viewZ++
                 loadRepaintView()
             } else if (key === '>') {
-                viewZ--
+                grid.viewZ--
                 loadRepaintView()
             } else if (key === 'ArrowUp') {
-                if (viewMinY >= 16) {
-                    viewMinY -= 16
+                if (grid.viewMinY >= 16) {
+                    grid.viewMinY -= 16
                 } else {
-                    viewMinY -= viewMinY
+                    grid.viewMinY -= grid.viewMinY
                 }
                 loadRepaintView()
             } else if (key === 'ArrowDown') {
-                if (viewMinY + viewHeight <= 176) {
-                    viewMinY += 16
+                if (grid.viewMinY + grid.viewHeight <= 176) {
+                    grid.viewMinY += 16
                 } else {
-                    viewMinY += 192 - (viewMinY + viewHeight)
+                    grid.viewMinY += 192 - (grid.viewMinY + grid.viewHeight)
                 }
                 loadRepaintView()
             } else if (key === 'ArrowLeft') {
-                if (viewMinX >= 16) {
-                    viewMinX -= 16
+                if (grid.viewMinX >= 16) {
+                    grid.viewMinX -= 16
                 } else {
-                    viewMinX -= viewMinX
+                    grid.viewMinX -= grid.viewMinX
                 }
                 loadRepaintView()
             } else if (key === 'ArrowRight') {
-                if (viewMinX + viewWidth <= 176) {
-                    viewMinX += 16
+                if (grid.viewMinX + grid.viewWidth <= 176) {
+                    grid.viewMinX += 16
                 } else {
-                    viewMinX += 192 - (viewMinX + viewWidth)
+                    grid.viewMinX += 192 - (grid.viewMinX + grid.viewWidth)
                 }
                 loadRepaintView()
             } else if (key === ' ') {
@@ -542,8 +548,8 @@ const bindKVMControls = (
     })
 
     canvas.addEventListener('mousemove', e => {
-        cursor.x = Math.floor(e.offsetX / pSize)
-        cursor.y = Math.floor(e.offsetY / pSize)
+        grid.cursor.x = Math.floor(e.offsetX / grid.pSize)
+        grid.cursor.y = Math.floor(e.offsetY / grid.pSize)
         updateCaption(caption)
     })
 
@@ -554,7 +560,7 @@ const bindKVMControls = (
     })
 
     window.addEventListener('resize', e => {
-        resizeView()
+        grid.resizeView(canvas)
         repaintView()  // FIXME refresh if too big?
     })
 }
@@ -568,7 +574,10 @@ async function main () {
     /* @ts-ignore FIXME Debugging assignments */
     window['df'] = df
     tileWriter = new TileWriter(document.getElementById('tileset') as HTMLImageElement)
-    resizeView()
+
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement
+    const viewport = new Viewport()
+    viewport.resizeView(canvas)
 
     const ctx = canvas.getContext('2d')
 
