@@ -1,7 +1,6 @@
-# Project temp:
-build/*
-test/*
-
+# Build artifacts
+/*.js
+srv/*.js
 
 # General
 .DS_Store
