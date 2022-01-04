@@ -149,6 +149,14 @@ const writeBgTile = (
     context.fillRect(pSize * xi, pSize * yi, pSize, pSize)
 }
 
+const writeShadowOnTile = (
+    context: CanvasRenderingContext2D,
+    xi: number, yi: number, pSize: number
+) => {
+    context.fillStyle = 'rgba(0, 0, 0, 0.4)'
+    context.fillRect(xi * pSize, yi * pSize, pSize, pSize)
+}
+
 class TileWriter {
     /** Cache of colored atlases, for all 16 colors. */
     readonly coloredAtlases: HTMLCanvasElement[]
@@ -217,6 +225,8 @@ class Viewport {
     public viewMinY: number = 80
     /** Z-coordinate of top-left tile in viewport */
     public viewZ: number = 158
+    /** Maximum depth of empty tiles the viewport will see through */
+    public viewDepth: number = 4
 
     /** Location of last hovered tile in viewport */
     public cursor = { x: 0, y: 0 }
@@ -233,7 +243,7 @@ class Viewport {
         return fixBlockRequest({
             'minX': Math.max(Math.floor(this.viewMinX / 16), 0),
             'minY': Math.max(Math.floor(this.viewMinY / 16), 0),
-            'minZ': this.viewZ,
+            'minZ': this.viewZ - this.viewDepth,
             'maxX': Math.max(Math.ceil((this.viewMinX + this.viewWidth) / 16), 12),
             'maxY': Math.max(Math.ceil((this.viewMinY + this.viewHeight) / 16), 12),
             'maxZ': this.viewZ + 1
@@ -378,6 +388,37 @@ const paintCachedTiles = (ctx: CanvasRenderingContext2D, blockMap: Block[][][]) 
                     writeBgTile(ctx, j, i, grid.pSize, bgc)
                 } else if (tile.vein !== undefined) {
                     // TODO
+                } else if (tile.tileID === TILE_EMPTY) {
+                    // see through
+                    let depth: number = 1
+                    let foundTile: boolean = false
+                    while (depth <= grid.viewDepth && !foundTile) {
+                        const blockBelow = blockMap[grid.viewZ - depth][grid.viewMinY + i][grid.viewMinX + j]
+                        if (blockBelow.tileID !== TILE_EMPTY && blockBelow.tileID !== undefined) {
+                            if (blockBelow.unit.unit.length !== 0) {
+                                const bgc = blockBelow.unit.char[0][2]
+                                writeBgTile(ctx, j, i, grid.pSize, bgc)
+                                // no item case
+                            } else if (blockBelow.building !== undefined) {
+                                // TODO
+                            } else if (blockBelow.water !== 0) {
+                                const bgc = 0
+                                writeBgTile(ctx, j, i, grid.pSize, bgc)
+                            } else if (blockBelow.magma !== 0) {
+                                const bgc = 0
+                                writeBgTile(ctx, j, i, grid.pSize, bgc)
+                            } else if (blockBelow.vein !== undefined) {
+                                // TODO
+                            } else if (blockBelow.tileID != null && blockBelow.tile != null) {
+                                // regular tile
+                                writeBgTile(ctx, j, i, grid.pSize, blockBelow.tile[2])
+                            } else {
+                                console.warn('Unknown block case')
+                            }
+                            writeShadowOnTile(ctx, j, i, grid.pSize)
+                            foundTile = true
+                        } else depth++
+                    }
                 } else if (tile.tileID != null && tile.tile != null) {
                     // regular tile
                     writeBgTile(ctx, j, i, grid.pSize, tile.tile[2])
@@ -400,6 +441,35 @@ const paintCachedTiles = (ctx: CanvasRenderingContext2D, blockMap: Block[][][]) 
                     tileWriter.writeTile(ctx, (48 + tile.magma) as TileCharID, j, i, grid.pSize, 5)
                 } else if (tile.vein !== undefined) {
                     // TODO
+                } else if (tile.tileID === TILE_EMPTY) {
+                    // see through
+                    let depth: number = 1
+                    let foundTile: boolean = false
+                    while (depth <= grid.viewDepth && !foundTile) {
+                        const blockBelow = blockMap[grid.viewZ - depth][grid.viewMinY + i][grid.viewMinX + j]
+                        if (blockBelow.tileID !== TILE_EMPTY && blockBelow.tileID !== undefined) {
+                            if (blockBelow.unit.unit.length !== 0) {
+                                tileWriter.writeTile(ctx, blockBelow.unit.char[0][0], j, i, grid.pSize, blockBelow.unit.char[0][1])
+                            } else if (blockBelow.item !== undefined) {
+                                tileWriter.writeTile(ctx, blockBelow.item[0], j, i, grid.pSize, blockBelow.item[1])
+                            } else if (blockBelow.building !== undefined) {
+                                // TODO
+                            } else if (blockBelow.water !== 0) {
+                                tileWriter.writeTile(ctx, (48 + blockBelow.water) as TileCharID, j, i, grid.pSize, 1)
+                            } else if (blockBelow.magma !== 0) {
+                                tileWriter.writeTile(ctx, (48 + blockBelow.magma) as TileCharID, j, i, grid.pSize, 5)
+                            } else if (blockBelow.vein !== undefined) {
+                                // TODO
+                            } else if (blockBelow.tileID != null && blockBelow.tile != null) {
+                                // regular tile
+                                tileWriter.writeTile(ctx, blockBelow.tile[0], j, i, grid.pSize, blockBelow.tile[1])
+                            } else {
+                                console.warn('Unknown block case')
+                            }
+                            writeShadowOnTile(ctx, j, i, grid.pSize)
+                            foundTile = true
+                        } else depth++
+                    }
                 } else if (tile.tileID != null && tile.tile != null) {
                     // regular tile
                     tileWriter.writeTile(ctx, tile.tile[0], j, i, grid.pSize, tile.tile[1])
