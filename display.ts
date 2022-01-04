@@ -555,6 +555,7 @@ const bindKVMControls = (
     canvas: HTMLCanvasElement,
     caption: HTMLDivElement,
     camMode: HTMLSelectElement,
+    checkbox: HTMLInputElement,
     loadRepaintView: () => void,
     repaintView: () => void,
 ) => {
@@ -629,6 +630,22 @@ const bindKVMControls = (
         canvas.focus()
     })
 
+    let intervalRunning: boolean = false
+    let updater: NodeJS.Timer
+    checkbox.addEventListener('change', e => {
+        if (checkbox.checked) {
+            if (!intervalRunning) {
+                updater = setInterval(loadRepaintView, 1000)
+                intervalRunning = true
+            } else console.warn('Updating interval desynced from checkbox')
+        } else {
+            if (intervalRunning) {
+                clearInterval(updater)
+                intervalRunning = false
+            }
+        }
+    })
+
     window.addEventListener('resize', e => {
         grid.resizeView(canvas)
         repaintView()  // FIXME refresh if too big?
@@ -656,8 +673,9 @@ async function main () {
     {
         const caption = document.getElementById('caption') as HTMLDivElement
         const camMode = document.getElementById('viewMode') as HTMLSelectElement
+        const checkbox = document.getElementById('checkbox') as HTMLInputElement
         bindKVMControls(
-            canvas, caption, camMode,
+            canvas, caption, camMode, checkbox,
             () => updateCanvas(df, ctx), () => paintCachedTiles(ctx, blockMap)
         )
     }
